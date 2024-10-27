@@ -1,48 +1,54 @@
 const fs = require('fs');
 const path = require('path');
+const prefix = "//";
 
 module.exports = (client) => {
 
     client.commands = new Map();
 
-    // Caminho para a lista de comandos
-    const messageComandsPath = path.join(__dirname, '../comandos/message');
-    const messageComandsFiles = fs.readdirSync(messageComandsPath).filter(file => file.endsWith('.js'));
+    // Função para ler arquivos recursivamente em todas as subpastas
+    const readCommandsRecursively = (dir) => {
+        const files = fs.readdirSync(dir);
 
-    // Log dos arquivos de comando encontrados
-    console.log(`Comandos de menssagem encontrados: ${messageComandsFiles}`);
+        for (const file of files) {
+            const fullPath = path.join(dir, file);
+            const stat = fs.statSync(fullPath);
 
-    // Carregar todos os comandos
-    for (const file of messageComandsFiles) {
-        const command = require(`${messageComandsPath}/${file}`);
-        client.commands.set(command.name, command);
-    }
+            if (stat.isDirectory()) {
+                readCommandsRecursively(fullPath); // Se for uma pasta, chama a função novamente
+            } else if (file.endsWith('.js')) {
+                const command = require(fullPath);
+                client.commands.set(command.name, command);
 
-    // Ouvir mensagens e executar o comando correspondente
+                console.log(`Comando encontrado: ${command.name}`);
+            }
+        }
+    };
+
+    // Caminho para a pasta de comandos
+    const messageCommandsPath = path.join(__dirname, '../aplications/commands/message');
+    readCommandsRecursively(messageCommandsPath);
+
+    // Ouvir messagens e executar o comando correspondente
     client.on('messageCreate', (message) => {
-        // console.log(`Mensagem recebida de ${message.author.username}: ${message.content}`);
+        if(!message.content.startsWith(prefix) || message.author.bot) return;
 
-        if (!message.content.startsWith('//') || message.author.bot) return;
-
-        const args = message.content.slice(2).trim().split(/ +/);
+        const args = message.content.slice(2).trim().split(/ + /);
         const commandName = args.shift().toLowerCase();
         
-        // Verificação se os comandos estão sendo identificados
-        console.log(`Comando detectado: ${commandName}`);
+        console.log(`Um comando foi enviado por ${message.author.username}: ${commandName}`);
 
         const command = client.commands.get(commandName);
-        if (!command){
-            console.log('Comando não encontrado');
+        if (!command) {
+            console.log("Comando não encontrado");
             return;
-        };
+        }
 
         try {
             command.execute(message);
         } catch (error) {
             console.error(error);
-            message.reply('Houve um erro ao tentar executar esse comando!');
+            message.reply(`Houve um erro ao tentar executar o comando: ${commandName}`);
         };
-
     });
-
-};
+}
